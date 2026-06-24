@@ -1,0 +1,22 @@
+{
+  "name": "aura-study-ai",
+  "version": "1.0.0",
+  "description": "AI-powered Academic Planner & Study Assistant",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "academic-planner",
+    "study-assistant",
+    "note-summarizer",
+    "llama"
+  ],
+  "author": "Antigravity",
+  "license": "ISC",
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}
