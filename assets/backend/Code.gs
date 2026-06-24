@@ -1,23 +1,20 @@
 /**
- * Aura Study AI - Google Apps Script Backend Database Controller
+ * Aura Study AI - Production Backend Database & AI Controller
  * Attach this script to your Google Sheet (Extensions -> Apps Script)
- * Enable Web App Deployment: Execute as Me, Access: Anyone
+ * Store your GROQ_API_KEY in File -> Project Settings -> Script Properties
  */
 
-// Helper to open active sheet and ensure pages exist
 function getOrCreateSheet(name, headers) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(name);
   if (!sheet) {
     sheet = ss.insertSheet(name);
     sheet.appendRow(headers);
-    // Format headers bold
     sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold");
   }
   return sheet;
 }
 
-// Ensure all sheets are initialized properly
 function initializeDatabase() {
   getOrCreateSheet("Schedule", ["ID", "Subject", "Date", "Time", "Faculty", "Room", "CreatedAt"]);
   getOrCreateSheet("Assignments", ["ID", "Subject", "Title", "DueDate", "Priority", "Status", "CreatedAt"]);
@@ -26,7 +23,6 @@ function initializeDatabase() {
   getOrCreateSheet("Progress", ["ID", "Subject", "HoursStudied", "TopicsCompleted", "UpdatedAt"]);
 }
 
-// CORS & Request Routing for GET
 function doGet(e) {
   initializeDatabase();
   const action = e.parameter.action;
@@ -53,7 +49,7 @@ function doGet(e) {
         responseData = { success: true, data: getDashboard() };
         break;
       default:
-        responseData = { success: false, message: "Action '" + action + "' is not supported." };
+        responseData = { success: false, message: "Action '" + action + "' is not supported on GET." };
     }
   } catch (err) {
     responseData = { success: false, error: err.toString() };
@@ -63,10 +59,9 @@ function doGet(e) {
                        .setMimeType(ContentService.MimeType.JSON);
 }
 
-// CORS & Request Routing for POST
 function doPost(e) {
   initializeDatabase();
-  let responseData = { success: false, message: "Invalid payload or post data." };
+  let responseData = { success: false, message: "Invalid payload." };
 
   try {
     const postData = JSON.parse(e.postData.contents);
@@ -100,8 +95,11 @@ function doPost(e) {
       case "updateProgress":
         responseData = { success: true, message: updateProgress(postData) };
         break;
+      case "ai":
+        responseData = { success: true, data: handleAI(postData.mode, postData.promptData) };
+        break;
       default:
-        responseData = { success: false, message: "POST action '" + action + "' is not supported." };
+        responseData = { success: false, message: "Action '" + action + "' is not supported on POST." };
     }
   } catch (err) {
     responseData = { success: false, error: err.toString() };
@@ -112,27 +110,116 @@ function doPost(e) {
 }
 
 // -------------------------------------------------------------
-// CORE DATABASE OPERATIONS
+// SECURE AI ROUTING ENGINE (GROQ API CALLS)
 // -------------------------------------------------------------
 
-// Schedule CRUD
+function handleAI(mode, promptData) {
+  const apiKey = PropertiesService.getScriptProperties().getProperty("GROQ_API_KEY");
+  if (!apiKey) {
+    throw new Error("GROQ_API_KEY is not configured in Apps Script Project Settings -> Script Properties!");
+  }
+
+  let systemInstruction = "";
+  let userPrompt = "";
+
+  if (mode === "summarize" || mode === "notes") {
+    systemInstruction = `
+      You are AURA Study AI Note Analyst. Analyze the pasted notes.
+      You MUST respond ONLY with a raw JSON object containing the parsed categories.
+      Do not output any markdown ticks, conversational text, or wrapper tags.
+      Required JSON schema:
+      {
+        "summary": "Short paragraph summary of notes",
+        "keyConcepts": ["Concept 1", "Concept 2"],
+        "definitions": [{"term": "Term", "description": "Meaning"}],
+        "formulas": ["Formula 1", "Formula 2"],
+        "interviewQuestions": [{"question": "Q?", "answer": "A"}],
+        "examQuestions": [{"question": "Q?", "answer": "A"}],
+        "flashcards": [{"front": "Front of card", "back": "Back of card"}],
+        "revisionTips": ["Tip 1", "Tip 2"]
+      }
+    `;
+    userPrompt = `Subject: ${promptData.subject}\nTitle: ${promptData.title}\nContent:\n${promptData.text}`;
+  } 
+  else if (mode === "studyplan") {
+    systemInstruction = `
+      You are AURA Study Planner. Build a study timetable.
+      Return ONLY a JSON array of day objects. Do not write markdown, code blocks, or text.
+      JSON Schema:
+      [
+        {
+          "date": "Day 1",
+          "subject": "Subject Name",
+          "task": "Study target description",
+          "duration": 120,
+          "isBreak": false
+        }
+      ]
+    `;
+    userPrompt = `Subjects: ${promptData.subjects}\nExam Date: ${promptData.examDate}\nHours/Day: ${promptData.hours}\nDifficulty: ${promptData.difficulty}\nConfidence: ${promptData.confidence}\nWeak Topics: ${promptData.weakTopics}`;
+  }
+  else if (mode === "chat") {
+    systemInstruction = "You are AURA Academic Coach, powered by Llama 3.3. Act as a supportive, smart tutor. Answer queries in brief, structured layout.";
+    userPrompt = promptData.text;
+  }
+  else {
+    // Fallback/General AI support
+    systemInstruction = "You are AURA Study assistant. Return clean, helpful outputs.";
+    userPrompt = JSON.stringify(promptData);
+  }
+
+  return callGroq(apiKey, systemInstruction, userPrompt);
+}
+
+function callGroq(apiKey, systemInstruction, userPrompt) {
+  const url = "https://api.groq.com/openai/v1/chat/completions";
+  const payload = {
+    model: "llama-3.3-70b-versatile",
+    messages: [
+      { role: "system", content: systemInstruction },
+      { role: "user", content: userPrompt }
+    ],
+    temperature: 0.3,
+    max_tokens: 2000
+  };
+
+  const options = {
+    method: "post",
+    contentType: "application/json",
+    headers: {
+      Authorization: "Bearer " + apiKey
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  const response = UrlFetchApp.fetch(url, options);
+  const responseCode = response.getResponseCode();
+  const responseBody = response.getContentText();
+
+  if (responseCode !== 200) {
+    throw new Error("Groq API Call failed: " + responseCode + " - " + responseBody);
+  }
+
+  const json = JSON.parse(responseBody);
+  if (json.choices && json.choices[0].message.content) {
+    return json.choices[0].message.content;
+  }
+  throw new Error("Invalid output received from Groq.");
+}
+
+// -------------------------------------------------------------
+// SPREADSHEET SERVICES
+// -------------------------------------------------------------
+
 function getSchedule() {
   const sheet = getOrCreateSheet("Schedule", ["ID", "Subject", "Date", "Time", "Faculty", "Room", "CreatedAt"]);
   const values = sheet.getDataRange().getValues();
-  const schedule = [];
-  
+  const data = [];
   for (let i = 1; i < values.length; i++) {
-    schedule.push({
-      id: values[i][0],
-      subject: values[i][1],
-      date: values[i][2],
-      time: values[i][3],
-      faculty: values[i][4],
-      room: values[i][5],
-      createdAt: values[i][6]
-    });
+    data.push({ id: values[i][0], subject: values[i][1], date: values[i][2], time: values[i][3], faculty: values[i][4], room: values[i][5], createdAt: values[i][6] });
   }
-  return schedule;
+  return data;
 }
 
 function addSchedule(data) {
@@ -149,38 +236,28 @@ function deleteSchedule(id) {
   for (let i = 1; i < values.length; i++) {
     if (values[i][0] === id) {
       sheet.deleteRow(i + 1);
-      return "Schedule " + id + " deleted successfully.";
+      return "Deleted.";
     }
   }
-  throw new Error("Schedule with ID " + id + " not found.");
+  throw new Error("Not found.");
 }
 
-// Assignments CRUD
 function getAssignments() {
   const sheet = getOrCreateSheet("Assignments", ["ID", "Subject", "Title", "DueDate", "Priority", "Status", "CreatedAt"]);
   const values = sheet.getDataRange().getValues();
-  const assignments = [];
-
+  const data = [];
   for (let i = 1; i < values.length; i++) {
-    assignments.push({
-      id: values[i][0],
-      subject: values[i][1],
-      title: values[i][2],
-      dueDate: values[i][3],
-      priority: values[i][4],
-      status: values[i][5],
-      createdAt: values[i][6]
-    });
+    data.push({ id: values[i][0], subject: values[i][1], title: values[i][2], dueDate: values[i][3], priority: values[i][4], status: values[i][5], createdAt: values[i][6] });
   }
-  return assignments;
+  return data;
 }
 
 function addAssignment(data) {
   const sheet = getOrCreateSheet("Assignments", ["ID", "Subject", "Title", "DueDate", "Priority", "Status", "CreatedAt"]);
   const id = "ASG-" + Date.now();
   const createdAt = new Date().toISOString();
-  sheet.appendRow([id, data.subject, data.title, data.dueDate, data.priority, data.status || "Pending", createdAt]);
-  return { id: id, subject: data.subject, title: data.title, dueDate: data.dueDate, priority: data.priority, status: data.status || "Pending" };
+  sheet.appendRow([id, data.subject, data.title, data.dueDate, data.priority, data.status || "To Do", createdAt]);
+  return { id: id, title: data.title, status: data.status || "To Do" };
 }
 
 function updateAssignment(id, status) {
@@ -188,11 +265,11 @@ function updateAssignment(id, status) {
   const values = sheet.getDataRange().getValues();
   for (let i = 1; i < values.length; i++) {
     if (values[i][0] === id) {
-      sheet.getRange(i + 1, 6).setValue(status); // Column F is Status
-      return "Assignment status updated.";
+      sheet.getRange(i + 1, 6).setValue(status);
+      return "Updated.";
     }
   }
-  throw new Error("Assignment with ID " + id + " not found.");
+  throw new Error("Not found.");
 }
 
 function deleteAssignment(id) {
@@ -201,28 +278,20 @@ function deleteAssignment(id) {
   for (let i = 1; i < values.length; i++) {
     if (values[i][0] === id) {
       sheet.deleteRow(i + 1);
-      return "Assignment " + id + " deleted.";
+      return "Deleted.";
     }
   }
-  throw new Error("Assignment with ID " + id + " not found.");
+  throw new Error("Not found.");
 }
 
-// Notes CRUD
 function getNotes() {
   const sheet = getOrCreateSheet("Notes", ["ID", "Subject", "Title", "OriginalText", "AISummary", "CreatedAt"]);
   const values = sheet.getDataRange().getValues();
-  const notes = [];
+  const data = [];
   for (let i = 1; i < values.length; i++) {
-    notes.push({
-      id: values[i][0],
-      subject: values[i][1],
-      title: values[i][2],
-      originalText: values[i][3],
-      aiSummary: values[i][4],
-      createdAt: values[i][5]
-    });
+    data.push({ id: values[i][0], subject: values[i][1], title: values[i][2], originalText: values[i][3], aiSummary: values[i][4], createdAt: values[i][5] });
   }
-  return notes;
+  return data;
 }
 
 function saveNotes(data) {
@@ -230,31 +299,21 @@ function saveNotes(data) {
   const id = "NTE-" + Date.now();
   const createdAt = new Date().toISOString();
   sheet.appendRow([id, data.subject, data.title, data.originalText, data.aiSummary, createdAt]);
-  return { id: id, subject: data.subject, title: data.title, aiSummary: data.aiSummary };
+  return { id: id, title: data.title };
 }
 
-// Study Timetable CRUD
 function getStudyPlans() {
   const sheet = getOrCreateSheet("StudyPlans", ["ID", "Date", "Subject", "Task", "Duration", "Completed"]);
   const values = sheet.getDataRange().getValues();
-  const plans = [];
+  const data = [];
   for (let i = 1; i < values.length; i++) {
-    plans.push({
-      id: values[i][0],
-      date: values[i][1],
-      subject: values[i][2],
-      task: values[i][3],
-      duration: values[i][4],
-      completed: values[i][5] === true || values[i][5] === "true"
-    });
+    data.push({ id: values[i][0], date: values[i][1], subject: values[i][2], task: values[i][3], duration: values[i][4], completed: values[i][5] === true || values[i][5] === "true" });
   }
-  return plans;
+  return data;
 }
 
 function saveStudyPlan(planList) {
   const sheet = getOrCreateSheet("StudyPlans", ["ID", "Date", "Subject", "Task", "Duration", "Completed"]);
-  
-  // Clean all previous study plans (optional, to keep it updated with current plan)
   sheet.clearContents();
   sheet.appendRow(["ID", "Date", "Subject", "Task", "Duration", "Completed"]);
   sheet.getRange(1, 1, 1, 6).setFontWeight("bold");
@@ -263,7 +322,7 @@ function saveStudyPlan(planList) {
     const id = "PLN-" + Date.now() + "-" + idx;
     sheet.appendRow([id, plan.date, plan.subject, plan.task, plan.duration || 60, false]);
   });
-  return "Study plan saved successfully.";
+  return "Saved.";
 }
 
 function updateStudyPlan(id, completed) {
@@ -272,27 +331,20 @@ function updateStudyPlan(id, completed) {
   for (let i = 1; i < values.length; i++) {
     if (values[i][0] === id) {
       sheet.getRange(i + 1, 6).setValue(completed);
-      return "Study plan task status updated.";
+      return "Updated.";
     }
   }
-  throw new Error("Study plan task not found.");
+  throw new Error("Not found.");
 }
 
-// Progress Metrics CRUD
 function getProgress() {
   const sheet = getOrCreateSheet("Progress", ["ID", "Subject", "HoursStudied", "TopicsCompleted", "UpdatedAt"]);
   const values = sheet.getDataRange().getValues();
-  const progressList = [];
+  const data = [];
   for (let i = 1; i < values.length; i++) {
-    progressList.push({
-      id: values[i][0],
-      subject: values[i][1],
-      hoursStudied: Number(values[i][2]) || 0,
-      topicsCompleted: Number(values[i][3]) || 0,
-      updatedAt: values[i][4]
-    });
+    data.push({ id: values[i][0], subject: values[i][1], hoursStudied: Number(values[i][2]), topicsCompleted: Number(values[i][3]), updatedAt: values[i][4] });
   }
-  return progressList;
+  return data;
 }
 
 function updateProgress(data) {
@@ -300,23 +352,20 @@ function updateProgress(data) {
   const values = sheet.getDataRange().getValues();
   const updatedAt = new Date().toISOString();
 
-  // Find if subject metrics already exist
   for (let i = 1; i < values.length; i++) {
     if (values[i][1].toLowerCase() === data.subject.toLowerCase()) {
       sheet.getRange(i + 1, 3).setValue(Number(data.hoursStudied));
       sheet.getRange(i + 1, 4).setValue(Number(data.topicsCompleted));
       sheet.getRange(i + 1, 5).setValue(updatedAt);
-      return "Progress metrics updated for " + data.subject;
+      return "Updated.";
     }
   }
 
-  // Create new if absent
   const id = "PRG-" + Date.now();
   sheet.appendRow([id, data.subject, Number(data.hoursStudied), Number(data.topicsCompleted), updatedAt]);
-  return "New progress metrics created for " + data.subject;
+  return "Added.";
 }
 
-// Aggregate Dashboard stats in a single network trip for optimization
 function getDashboard() {
   const schedule = getSchedule();
   const assignments = getAssignments();
@@ -332,8 +381,7 @@ function getDashboard() {
   let totalHoursStudied = 0;
   progressList.forEach(p => totalHoursStudied += p.hoursStudied);
 
-  // Sorting utilities
-  const upcomingClasses = schedule.slice(0, 3); // Return next 3 classes
+  const upcomingClasses = schedule.slice(0, 3);
   const criticalAssignments = assignments
     .filter(a => a.status !== "Completed")
     .sort((a, b) => {
@@ -352,7 +400,7 @@ function getDashboard() {
     hoursStudied: totalHoursStudied,
     upcomingClasses: upcomingClasses,
     criticalAssignments: criticalAssignments,
-    studyPlans: studyPlans.slice(0, 5), // Today's plans
+    studyPlans: studyPlans,
     recentNotes: recentNotes,
     progressSummary: progressList
   };

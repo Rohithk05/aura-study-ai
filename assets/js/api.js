@@ -1,6 +1,6 @@
-import { APPS_SCRIPT_URL, GROQ_API_KEY } from './config.js';
+import { APPS_SCRIPT_URL } from './config.js';
+import { showToast } from './components/toast.js';
 
-// Central loader for visual spinner
 export function toggleLoader(show) {
   const syncStatus = document.getElementById('sync-status');
   if (!syncStatus) return;
@@ -14,7 +14,7 @@ export function toggleLoader(show) {
 }
 
 // -------------------------------------------------------------
-// GOOGLE APPS SCRIPT CLIENT API
+// GOOGLE APPS SCRIPT WEB SERVICE FETCH CLIENT
 // -------------------------------------------------------------
 
 export async function fetchFromAppsScript(action, method = 'GET', bodyData = null) {
@@ -35,8 +35,7 @@ export async function fetchFromAppsScript(action, method = 'GET', bodyData = nul
       url += `?action=${action}`;
     } else if (method === 'POST') {
       options.headers = {
-        // Apps Script receives text/plain to bypass complex preflight CORS options
-        'Content-Type': 'text/plain;charset=utf-8' 
+        'Content-Type': 'text/plain;charset=utf-8'
       };
       options.body = JSON.stringify({
         action: action,
@@ -50,64 +49,27 @@ export async function fetchFromAppsScript(action, method = 'GET', bodyData = nul
     }
     const result = await response.json();
     toggleLoader(false);
+    
+    if (result.success) {
+      // Toast notification for modifying actions
+      if (method === 'POST' && action !== 'ai') {
+        showToast("Database updated successfully!", "success");
+      }
+    } else {
+      showToast(result.message || "Database action failed", "error");
+    }
+    
     return result;
   } catch (err) {
     console.error("Apps Script Connection Failed:", err);
     toggleLoader(false);
-    // Graceful fallback to LocalStorage mock so app stays completely runnable
-    alert("Connection to Google Apps Script failed. Falling back to offline simulator.");
+    showToast("Apps Script connection failed. Loading local database.", "error");
     return fetchLocalStorageMock(action, method, bodyData);
   }
 }
 
 // -------------------------------------------------------------
-// GROQ AI llama-3.3-70b-versatile CLIENT API
-// -------------------------------------------------------------
-
-export async function callAI(prompt, systemInstruction) {
-  if (!GROQ_API_KEY) {
-    console.warn("GROQ_API_KEY is not set. Generating simulation fallback response.");
-    return callAISimulator(prompt, systemInstruction);
-  }
-
-  try {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: systemInstruction },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.5,
-        max_tokens: 1500
-      })
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Groq HTTP Error ${response.status}: ${errText}`);
-    }
-
-    const data = await response.json();
-    if (data.choices && data.choices[0].message.content) {
-      return data.choices[0].message.content;
-    } else {
-      throw new Error("Invalid output response structure from Groq.");
-    }
-  } catch (err) {
-    console.error("Groq API Call failed:", err);
-    alert("Groq API error. Running offline simulation fallback.");
-    return callAISimulator(prompt, systemInstruction);
-  }
-}
-
-// -------------------------------------------------------------
-// OFFLINE FALLBACK ENGINE (LOCALSTORAGE ENGINE)
+// OFFLINE FALLBACK MOCK ENGINE
 // -------------------------------------------------------------
 
 function fetchLocalStorageMock(action, method, bodyData) {
@@ -153,15 +115,18 @@ function fetchLocalStorageMock(action, method, bodyData) {
         const newClass = { id: 'SCH-' + Date.now(), ...bodyData, createdAt: new Date().toISOString() };
         classes.push(newClass);
         localStorage.setItem('aura_classes_db', JSON.stringify(classes));
+        showToast("Class scheduled locally!", "success");
         return { success: true, data: newClass };
       case 'deleteSchedule':
         classes = classes.filter(c => c.id !== bodyData.id);
         localStorage.setItem('aura_classes_db', JSON.stringify(classes));
-        return { success: true, message: 'Class deleted locally.' };
+        showToast("Class removed locally.", "success");
+        return { success: true, message: 'Class deleted.' };
       case 'addAssignment':
-        const newA = { id: 'ASG-' + Date.now(), ...bodyData, status: 'Pending', createdAt: new Date().toISOString() };
+        const newA = { id: 'ASG-' + Date.now(), ...bodyData, createdAt: new Date().toISOString() };
         assignments.push(newA);
         localStorage.setItem('aura_assignments_db', JSON.stringify(assignments));
+        showToast("Task added locally!", "success");
         return { success: true, data: newA };
       case 'updateAssignment':
         const aIndex = assignments.findIndex(a => a.id === bodyData.id);
@@ -169,27 +134,32 @@ function fetchLocalStorageMock(action, method, bodyData) {
           assignments[aIndex].status = bodyData.status;
           localStorage.setItem('aura_assignments_db', JSON.stringify(assignments));
         }
-        return { success: true, message: 'Assignment updated locally.' };
+        showToast("Task updated locally.", "success");
+        return { success: true, message: 'Assignment updated.' };
       case 'deleteAssignment':
         assignments = assignments.filter(a => a.id !== bodyData.id);
         localStorage.setItem('aura_assignments_db', JSON.stringify(assignments));
+        showToast("Task deleted.", "success");
         return { success: true, message: 'Assignment deleted.' };
       case 'saveNotes':
         const newN = { id: 'NTE-' + Date.now(), ...bodyData, createdAt: new Date().toISOString() };
         notes.push(newN);
         localStorage.setItem('aura_notes_db', JSON.stringify(notes));
+        showToast("AI Summary saved locally!", "success");
         return { success: true, data: newN };
       case 'saveStudyPlan':
         plans = bodyData.plan.map((p, idx) => ({ id: 'PLN-' + Date.now() + '-' + idx, ...p, completed: false }));
         localStorage.setItem('aura_plans_db', JSON.stringify(plans));
-        return { success: true, message: 'Plan saved locally.' };
+        showToast("Study plans generated locally!", "success");
+        return { success: true, message: 'Plan saved.' };
       case 'updateStudyPlan':
         const pIndex = plans.findIndex(p => p.id === bodyData.id);
         if (pIndex !== -1) {
           plans[pIndex].completed = bodyData.completed;
           localStorage.setItem('aura_plans_db', JSON.stringify(plans));
         }
-        return { success: true, message: 'Plan task status updated.' };
+        showToast("Plan check updated.", "success");
+        return { success: true, message: 'Plan updated.' };
       case 'updateProgress':
         const prgIndex = progress.findIndex(p => p.subject.toLowerCase() === bodyData.subject.toLowerCase());
         if (prgIndex !== -1) {
@@ -200,53 +170,39 @@ function fetchLocalStorageMock(action, method, bodyData) {
           progress.push({ id: 'PRG-' + Date.now(), subject: bodyData.subject, hoursStudied: bodyData.hoursStudied, topicsCompleted: bodyData.topicsCompleted, updatedAt: new Date().toISOString() });
         }
         localStorage.setItem('aura_progress_db', JSON.stringify(progress));
+        showToast("Progress logged locally!", "success");
         return { success: true, message: 'Progress updated.' };
+      case 'ai':
+        // Offline Local Mock Responses
+        if (bodyData.mode === 'summarize') {
+          return {
+            success: true,
+            data: JSON.stringify({
+              summary: "A local mock overview summary representing your lecture notes content.",
+              keyConcepts: ["Syllabus Milestones", "Normal Forms", "IP Address Routing"],
+              definitions: [{ term: "Normalization", description: "Process of reducing redundances in database structures." }],
+              formulas: ["Hours studied = Duration / 60"],
+              interviewQuestions: [{ question: "What is 3NF?", answer: "Third Normal Form removes transitive dependencies." }],
+              examQuestions: [{ question: "Prove BCNF satisfies 3NF?", answer: "BCNF is a stricter form of 3NF." }],
+              flashcards: [{ front: "SRAM component", back: "Transistors cache cell" }],
+              revisionTips: ["Focus on subnet masks calculations", "Solve past normal forms queries"]
+            })
+          };
+        } else if (bodyData.mode === 'studyplan') {
+          return {
+            success: true,
+            data: JSON.stringify([
+              { date: "Day 1", subject: "DBMS", task: "Normal Forms theory revisions", duration: 120, isBreak: false },
+              { date: "Day 1", subject: "Syllabus Break", task: "Rest & Hydrate", duration: 30, isBreak: true },
+              { date: "Day 2", subject: "Computer Networks", task: "IP Header routing tables", duration: 120, isBreak: false }
+            ])
+          };
+        } else if (bodyData.mode === 'chat') {
+          return {
+            success: true,
+            data: "This is a local simulation response. Set up your Google Apps Script URL and save your GROQ_API_KEY in script settings to activate real Llama AI!"
+          };
+        }
     }
   }
-}
-
-function callAISimulator(prompt, systemInstruction) {
-  // Return intelligent local mock responses
-  if (systemInstruction.includes("note summarizer")) {
-    return `
-<h2>Summary: Advanced Concepts Compilation</h2>
-<br>
-<strong>MAIN LECTURE SUMMARY</strong><br>
-- Condensed representation of dense notes inputs.<br>
-- Visual maps outlining structure patterns.<br>
-<br>
-<strong>DEFINITIONS & CRITICAL CONCEPTS</strong><br>
-- <em>Normalization:</em> Process of database structure organization to minimize redundancies.<br>
-- <em>Redundancy:</em> Unnecessary duplication of data records across layers.<br>
-<br>
-<strong>EXAM STUDY REVISION NOTES</strong><br>
-- Study 3NF normalization proofs. High likelihood of test questions.
-    `;
-  } else if (systemInstruction.includes("AI study coach")) {
-    return JSON.stringify([
-      {
-        "dayNum": 1,
-        "studyHours": 4,
-        "slots": [
-          { "timeLabel": "09:00 AM - 11:00 AM", "subject": "DBMS", "topic": "Normalization theory", "outcome": "Solve 3NF questions", "isWeakFocus": true },
-          { "timeLabel": "02:00 PM - 04:00 PM", "subject": "Networks", "topic": "IP Routing protocols", "outcome": "Learn OSPF packet header", "isWeakFocus": false }
-        ]
-      }
-    ]);
-  } else if (prompt.includes("Flashcards")) {
-    return `
-- **Concept**: SRAM vs DRAM
-  **Definition**: SRAM is cache memory using transistors (fast, expensive). DRAM is main system RAM using capacitors (slower, must refresh).
-- **Concept**: Normalization Goal
-  **Definition**: Organize database relations to reduce anomalies and remove dependencies.
-    `;
-  } else if (prompt.includes("Quiz")) {
-    return `
-1. **Question**: What is Thrashing in virtual memory?
-   - **Answer**: A state where the CPU spends more time swapping pages in/out of secondary disk than executing instructions.
-2. **Question**: What layer does Router operate on?
-   - **Answer**: The Network Layer (Layer 3).
-    `;
-  }
-  return "Operational Simulation Output. Enter your Groq API Key to enable the real Llama 3.3 AI Model.";
 }

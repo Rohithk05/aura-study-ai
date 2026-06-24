@@ -1,10 +1,10 @@
-import { fetchFromAppsScript } from './api.js';
+import { fetchFromAppsScript } from '../api.js';
 
 export async function loadScheduleView() {
   const tbody = document.getElementById('schedule-table-body');
   if (!tbody) return;
   
-  tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--color-primary);">Loading schedule database...</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--color-primary);">Loading schedule...</td></tr>`;
 
   try {
     const result = await fetchFromAppsScript('getSchedule', 'GET');
@@ -21,7 +21,6 @@ export async function loadScheduleView() {
       return;
     }
 
-    // Sort by day name (Monday -> Sunday)
     const dayOrder = { "Monday": 1, "Tuesday": 2, "Wednesday": 3, "Thursday": 4, "Friday": 5, "Saturday": 6, "Sunday": 7 };
     const sorted = [...schedule].sort((a, b) => (dayOrder[a.date] || 8) - (dayOrder[b.date] || 8));
 
@@ -45,7 +44,6 @@ export async function loadScheduleView() {
       `;
     });
 
-    // Bind delete actions
     tbody.querySelectorAll('.delete-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-id');
@@ -64,7 +62,7 @@ export async function addScheduleItem() {
   const time = document.getElementById('class-time').value.trim();
   const date = document.getElementById('class-date').value.trim();
   const mode = document.getElementById('class-mode').value;
-  const faculty = document.getElementById('class-notes').value.trim(); // We use notes input as faculty name
+  const faculty = document.getElementById('class-notes').value.trim();
   const room = document.getElementById('class-room') ? document.getElementById('class-room').value.trim() : '';
 
   if (!subject || !time || !date) return;
@@ -80,7 +78,6 @@ export async function addScheduleItem() {
 
   const result = await fetchFromAppsScript('addSchedule', 'POST', payload);
   if (result.success) {
-    // Reset Form
     document.getElementById('form-add-class').reset();
     await loadScheduleView();
   } else {
