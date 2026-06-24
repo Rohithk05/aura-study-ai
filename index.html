@@ -3,14 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="AI Academic Planner & Study Assistant - Your personal companion for schedule management, assignment tracking, study planning, note summaries, and exam countdowns.">
-  <title>AURA Study AI - Academic Planner & Assistant</title>
+  <meta name="description" content="Aura Study AI - Production-grade Academic Planner and Study Assistant powered by Llama 3.3 70B & Google Sheets database.">
+  <title>Aura Study AI - Academic Planner & Assistant</title>
   <link rel="stylesheet" href="styles.css">
-  <!-- Google API Client & Identity Services Loader -->
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="https://apis.google.com/js/api.js" async defer></script>
 </head>
-<body>
+<body class="dark-mode">
 
   <!-- Navigation Sidebar -->
   <aside id="sidebar">
@@ -26,11 +23,8 @@
 
     <!-- Active Connections Stats -->
     <div style="padding: 0 24px 15px 24px; display: flex; flex-direction: column; gap: 6px;">
-      <div class="connection-status-badge" id="google-status">
-        <span class="status-indicator-dot offline">●</span> Google Sheets Offline
-      </div>
-      <div class="connection-status-badge" id="gemini-status">
-        <span class="status-indicator-dot offline">●</span> Gemini AI Offline
+      <div class="connection-status-badge" id="sheets-connection-badge">
+        <span class="status-indicator-dot online">●</span> Sync Status Active
       </div>
     </div>
 
@@ -40,12 +34,6 @@
         <button id="nav-dashboard">
           <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
           <span class="menu-item-text">Dashboard</span>
-        </button>
-      </li>
-      <li class="menu-item" data-view="chat">
-        <button id="nav-chat">
-          <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          <span class="menu-item-text">AI Coach</span>
         </button>
       </li>
       <li class="menu-item" data-view="schedule">
@@ -60,10 +48,10 @@
           <span class="menu-item-text">Assignments</span>
         </button>
       </li>
-      <li class="menu-item" data-view="summarizer">
-        <button id="nav-summarizer">
+      <li class="menu-item" data-view="notes">
+        <button id="nav-notes">
           <svg viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
-          <span class="menu-item-text">AI Summarizer</span>
+          <span class="menu-item-text">Notes Summary</span>
         </button>
       </li>
       <li class="menu-item" data-view="planner">
@@ -72,36 +60,27 @@
           <span class="menu-item-text">Study Planner</span>
         </button>
       </li>
-      <li class="menu-item" data-view="countdown">
-        <button id="nav-countdown">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          <span class="menu-item-text">Countdowns</span>
+      <li class="menu-item" data-view="progress">
+        <button id="nav-progress">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <span class="menu-item-text">Progress Tracker</span>
         </button>
       </li>
     </ul>
 
-    <!-- Authentication / Config Control in Sidebar Footer -->
+    <!-- Footer Controls -->
     <div class="sidebar-footer">
-      <div class="user-profile" style="margin-bottom: 12px;" id="google-profile-container">
-        <div class="user-avatar" id="profile-avatar">G</div>
+      <div class="user-profile" style="margin-bottom: 12px;">
+        <div class="user-avatar" id="profile-avatar">RK</div>
         <div class="user-info">
-          <span class="user-name" id="google-user-name">Guest Student</span>
-          <span class="user-role" id="google-user-email">Not Signed In</span>
+          <span class="user-name">Rohith Karthikeya</span>
+          <span class="user-role">Student Portal</span>
         </div>
       </div>
-      <div style="display: flex; flex-direction: column; gap: 8px;">
-        <button class="secondary-btn" id="btn-google-login" style="padding: 10px; font-size: 0.85rem; justify-content: center; width: 100%;">
-          <svg viewBox="0 0 24 24" width="16" height="16" style="margin-right: 6px;"><path fill="#EA4335" d="M12 5.04c1.7 0 3.2.6 4.4 1.76l3.3-3.3C17.7 1.6 15.1 1 12 1 7.3 1 3.4 3.7 1.6 7.6l3.9 3c.9-2.7 3.4-4.56 6.5-4.56z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.7z"/><path fill="#FBBC05" d="M5.5 14.4c-.2-.6-.3-1.3-.3-2s.1-1.4.3-2l-3.9-3C.6 9.2 0 10.5 0 12s.6 2.8 1.6 4.6l3.9-3.2z"/><path fill="#34A853" d="M12 23c3.2 0 6-1.1 7.9-2.9l-3.7-2.9c-1.1.7-2.6 1.2-4.2 1.2-3.1 0-5.6-1.9-6.5-4.6l-3.9 3C3.4 20.3 7.3 23 12 23z"/></svg>
-          Connect Google Sheets
-        </button>
-        <button class="secondary-btn" id="btn-google-logout" style="padding: 10px; font-size: 0.85rem; justify-content: center; width: 100%; display: none;">
-          Sign Out of Google
-        </button>
-        <button class="glow-btn" id="btn-open-settings" style="padding: 10px; font-size: 0.85rem; justify-content: center; width: 100%;">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          API Settings Keys
-        </button>
-      </div>
+      <button class="secondary-btn" id="btn-toggle-theme" style="padding: 10px; font-size: 0.85rem; justify-content: center; width: 100%;">
+        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2" style="margin-right: 6px;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        Toggle Light Mode
+      </button>
     </div>
   </aside>
 
@@ -112,13 +91,11 @@
         <h1 id="view-title">Academic Dashboard</h1>
       </div>
       <div class="header-actions">
-        <span class="header-time" id="clock-display">00:00:00</span>
-        <button class="secondary-btn" id="btn-sync-calendar" style="padding: 6px 12px; font-size: 0.8rem;">
-          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2" style="margin-right: 4px;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-          Sync Calendar
-        </button>
+        <div class="search-bar-wrapper">
+          <input type="text" id="global-search" placeholder="Search planner databases..." class="form-input" style="padding: 8px 16px; min-width: 250px; background: rgba(255, 255, 255, 0.02);">
+        </div>
         <div class="sync-badge" id="sync-status">
-          <span class="sync-dot">●</span> Google Cloud Active
+          <span class="sync-dot">●</span> Live Sheets Active
         </div>
       </div>
     </header>
@@ -133,7 +110,7 @@
             <div class="stat-info">
               <span class="stat-label">Pending Assignments</span>
               <span class="stat-val" id="stat-pending-tasks">0</span>
-              <span class="stat-desc" id="stat-pending-subtext">Due this week</span>
+              <span class="stat-desc">Due this term</span>
             </div>
             <div class="stat-icon primary">
               <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
@@ -141,19 +118,9 @@
           </div>
           <div class="glass-panel stat-card">
             <div class="stat-info">
-              <span class="stat-label">Exams Ahead</span>
-              <span class="stat-val" id="stat-exams">0</span>
-              <span class="stat-desc" id="stat-exams-subtext">Upcoming assessments</span>
-            </div>
-            <div class="stat-icon secondary">
-              <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            </div>
-          </div>
-          <div class="glass-panel stat-card">
-            <div class="stat-info">
-              <span class="stat-label">Today's Classes</span>
+              <span class="stat-label">Total Classes</span>
               <span class="stat-val" id="stat-classes">0</span>
-              <span class="stat-desc" id="stat-classes-subtext">Lectures scheduled</span>
+              <span class="stat-desc">Lectures logged</span>
             </div>
             <div class="stat-icon accent">
               <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -172,7 +139,7 @@
         </div>
 
         <div class="dashboard-details">
-          <!-- Today's Schedule -->
+          <!-- Upcoming Classes -->
           <div class="glass-panel detail-card">
             <div class="card-header">
               <h3>
@@ -201,53 +168,13 @@
         </div>
       </section>
 
-      <!-- 2. AI ASSISTANT VIEW -->
-      <section id="view-chat" class="content-view">
-        <div class="chat-container glass-panel">
-          <div class="card-header" style="border-bottom: 1px solid var(--border-glass);">
-            <h3>
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              Llama AI Academic Coach
-            </h3>
-            <span class="sync-badge" id="chat-ai-indicator" style="background: rgba(139, 92, 246, 0.08); border-color: rgba(139, 92, 246, 0.2); color: var(--color-primary);">AI Engine Offline</span>
-          </div>
-          
-          <div class="chat-history" id="chat-history-container">
-            <div class="chat-bubble assistant">
-              <div class="bubble-avatar">L3</div>
-              <div class="bubble-content">
-                <p>Hello! I am your AI-powered Academic Coach. Once you connect your <strong>Gemini API Key</strong> in the Settings modal, I will run as a real AI!</p>
-                <p>You can ask me to:</p>
-                <ul>
-                  <li><strong>Summarize Lecture Notes</strong> (Try: "Summarize this lecture context...")</li>
-                  <li><strong>Set Class Schedules</strong> (Try: "Sync class schedule...")</li>
-                  <li><strong>Track Assignment Deadlines</strong> (Try: "My DBMS assignment is due next Friday")</li>
-                  <li><strong>Personalized Study Plans</strong> (Try: "I have 3 subjects and exams in 10 days")</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          <div class="chat-input-area">
-            <input type="text" class="chat-input" id="chat-input-field" placeholder="Ask about schedules, summarize text, generate revision plans...">
-            <button class="chat-send-btn" id="btn-chat-send">
-              <svg viewBox="0 0 24 24"><polygon points="22 2 11 13 2 9 22 2"/><polygon points="22 2 15 22 11 13 22 2"/></svg>
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <!-- 3. CLASS SCHEDULE VIEW -->
+      <!-- 2. CLASS SCHEDULE VIEW -->
       <section id="view-schedule" class="content-view">
         <div class="page-header-actions">
           <div class="page-title-desc">
             <h2>Class Schedules</h2>
-            <p>Organize your university classes, lectures, and calendar-ready events.</p>
+            <p>Organize your university classes, lectures, and database records.</p>
           </div>
-          <button class="glow-btn" id="btn-sync-gcal">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            Export to Google Calendar
-          </button>
         </div>
 
         <div class="view-columns">
@@ -265,7 +192,7 @@
                     <th>Time</th>
                     <th>Date/Day</th>
                     <th>Location / Mode</th>
-                    <th>Notes</th>
+                    <th>Details</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -293,7 +220,7 @@
               </div>
               <div class="form-group">
                 <label for="class-date">Day / Date</label>
-                <input type="text" class="form-input" id="class-date" placeholder="e.g. Monday or Wednesday" required>
+                <input type="text" class="form-input" id="class-date" placeholder="e.g. Monday, Wednesday" required>
               </div>
               <div class="form-group">
                 <label for="class-mode">Mode / Location</label>
@@ -303,8 +230,12 @@
                 </select>
               </div>
               <div class="form-group">
-                <label for="class-notes">Additional Notes</label>
-                <input type="text" class="form-input" id="class-notes" placeholder="Room 402, Lecture Hall B">
+                <label for="class-notes">Faculty Name</label>
+                <input type="text" class="form-input" id="class-notes" placeholder="e.g. Dr. John Doe">
+              </div>
+              <div class="form-group">
+                <label for="class-room">Room / Lecture Hall</label>
+                <input type="text" class="form-input" id="class-room" placeholder="e.g. Room 402, Hall B">
               </div>
               <div class="action-row">
                 <button type="submit" class="glow-btn" id="btn-save-class">Save Class Schedule</button>
@@ -314,17 +245,13 @@
         </div>
       </section>
 
-      <!-- 4. ASSIGNMENT TRACKER VIEW -->
+      <!-- 3. ASSIGNMENT TRACKER VIEW -->
       <section id="view-assignments" class="content-view">
         <div class="page-header-actions">
           <div class="page-title-desc">
             <h2>Assignment Planner</h2>
-            <p>Keep track of homework, projects, priority deadlines, and Google Sheet sync status.</p>
+            <p>Keep track of homework, projects, priority deadlines, and Google Sheets status.</p>
           </div>
-          <button class="glow-btn" id="btn-sync-sheets" style="background: var(--gradient-success); box-shadow: 0 4px 15px rgba(16, 185, 129, 0.2);">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            Sync to Google Sheets
-          </button>
         </div>
 
         <!-- Kanban Board View -->
@@ -385,8 +312,8 @@
               <input type="text" class="form-input" id="assign-subject" placeholder="e.g. DBMS" required>
             </div>
             <div class="form-group">
-              <label for="assign-due">Due Date (YYYY-MM-DD)</label>
-              <input type="text" class="form-input" id="assign-due" placeholder="e.g. 2026-07-02" required>
+              <label for="assign-due">Due Date</label>
+              <input type="date" class="form-input" id="assign-due" required>
             </div>
             <div class="form-group">
               <label for="assign-priority">Priority</label>
@@ -409,12 +336,12 @@
         </div>
       </section>
 
-      <!-- 5. AI NOTE SUMMARIZER VIEW -->
-      <section id="view-summarizer" class="content-view">
+      <!-- 4. AI NOTE SUMMARIZER VIEW -->
+      <section id="view-notes" class="content-view">
         <div class="page-header-actions">
           <div class="page-title-desc">
             <h2>AI Note Summarizer</h2>
-            <p>Paste dense lecture logs or text to extract definitions, formulas, and concepts instantly.</p>
+            <p>Paste dense lecture logs or text to extract definitions, formulas, and concepts instantly using Llama 3.3.</p>
           </div>
           <div class="header-actions">
             <button class="secondary-btn" id="btn-clear-summarizer">Clear Input</button>
@@ -433,9 +360,19 @@
               Input Lecture Notes / Textbook Content
             </div>
             <form class="glass-form" id="form-summarizer" style="height: 100%; display: flex; flex-direction: column;" onsubmit="return false;">
-              <div class="form-group" style="flex-grow: 1;">
+              <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div>
+                  <label for="summarizer-subject">Subject</label>
+                  <input type="text" class="form-input" id="summarizer-subject" placeholder="e.g. DBMS" required>
+                </div>
+                <div>
+                  <label for="summarizer-title">Title</label>
+                  <input type="text" class="form-input" id="summarizer-title" placeholder="e.g. Relational Calculus Notes" required>
+                </div>
+              </div>
+              <div class="form-group" style="flex-grow: 1; margin-top: 12px;">
                 <label for="summarizer-text">Paste Study Materials (Text limits apply: Up to 5000 characters)</label>
-                <textarea class="form-textarea" id="summarizer-text" style="flex-grow: 1; resize: none; min-height: 250px;" placeholder="Paste raw textbook text, transcripts or lecture slides details here..." required></textarea>
+                <textarea class="form-textarea" id="summarizer-text" style="flex-grow: 1; resize: none; min-height: 200px;" placeholder="Paste raw textbook text, transcripts or lecture slides details here..." required></textarea>
               </div>
               <div class="form-group" style="margin-top: 10px;">
                 <label for="summarizer-focus">Focus Style Mode</label>
@@ -448,23 +385,32 @@
               <div class="action-row" style="margin-top: 16px;">
                 <button type="submit" class="glow-btn" id="btn-run-summarizer">
                   <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                  Generate AI Summary (Gemini API)
+                  Generate AI Summary (Llama 3.3)
                 </button>
               </div>
             </form>
           </div>
 
-          <!-- AI Output Card -->
-          <div class="glass-panel grid-card" style="display: flex; flex-direction: column;">
+          <!-- Directory side view -->
+          <div class="glass-panel grid-card" style="display: flex; flex-direction: column; gap: 20px;">
             <div class="grid-card-title">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              Recent AI Summaries
+            </div>
+            
+            <div id="recent-notes-container" style="flex-grow: 1; max-height: 180px; overflow-y: auto;">
+              <!-- Rendered dynamically -->
+            </div>
+
+            <div class="grid-card-title" style="margin-top: 20px; border-top: 1px solid var(--border-glass); padding-top: 20px;">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-              Structured Output Results
+              AI Structured Output
             </div>
             
             <div id="summarizer-result-container" style="flex-grow: 1;">
               <div class="empty-state" id="summarizer-empty">
                 <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-                <div class="empty-state-text">No summary generated yet.<br>Enter notes and click "Generate AI Summary".</div>
+                <div class="empty-state-text">No summary generated yet.</div>
               </div>
               
               <div class="summarizer-output" id="summarizer-output-box" style="display: none;">
@@ -475,12 +421,12 @@
         </div>
       </section>
 
-      <!-- 6. STUDY PLANNER VIEW -->
+      <!-- 5. STUDY PLANNER VIEW -->
       <section id="view-planner" class="content-view">
         <div class="page-header-actions">
           <div class="page-title-desc">
             <h2>Personalized Study Planner</h2>
-            <p>Generate optimized exam-oriented revision timelines that adapt to workload schedules.</p>
+            <p>Generate optimized exam-oriented revision timelines directly linked to Google Sheets.</p>
           </div>
         </div>
 
@@ -505,12 +451,8 @@
                 <input type="number" class="form-input" id="study-hours" value="4" min="1" max="16" required>
               </div>
               <div class="form-group">
-                <label for="study-weak">Weak or High Priority Subject</label>
-                <select class="form-select" id="study-weak">
-                  <option value="DBMS">DBMS</option>
-                  <option value="Computer Networks">Computer Networks</option>
-                  <option value="Software Engineering">Software Engineering</option>
-                </select>
+                <label for="study-weak">Weak or High Focus Subject</label>
+                <input type="text" class="form-input" id="study-weak" value="DBMS" required>
               </div>
               <div class="action-row">
                 <button type="submit" class="glow-btn" id="btn-generate-plan">Generate Adaptive Plan</button>
@@ -521,14 +463,14 @@
           <!-- generated plan outputs -->
           <div class="glass-panel grid-card" style="display: flex; flex-direction: column;">
             <div class="grid-card-title">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-              Weekly Schedule Study Plan Grid
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/></svg>
+              Daily Study Task Grid
             </div>
 
             <div id="planner-result-container" style="flex-grow: 1;">
               <div class="empty-state" id="planner-empty">
                 <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                <div class="empty-state-text">No customized planner plan has been built.<br>Configure planner variables on the left.</div>
+                <div class="empty-state-text">No study plan timetable has been compiled.</div>
               </div>
 
               <div class="plan-output-grid" id="planner-output-box" style="display: none;">
@@ -539,68 +481,60 @@
         </div>
       </section>
 
-      <!-- 7. COUNTDOWNS & REVISION SUPPORT VIEW -->
-      <section id="view-countdown" class="content-view">
+      <!-- 6. PROGRESS TRACKER VIEW -->
+      <section id="view-progress" class="content-view">
         <div class="page-header-actions">
           <div class="page-title-desc">
-            <h2>Assessments, Exams & Countdowns</h2>
-            <p>Track remaining days, exam schedules, and recommendations for strategic revision orders.</p>
+            <h2>Academic Progress Card</h2>
+            <p>Log total hours spent studying and target topics completed per course.</p>
           </div>
-          <button class="glow-btn" id="btn-add-exam-trigger">Add Assessment Target</button>
-        </div>
-
-        <div class="countdowns-grid" id="countdowns-container">
-          <!-- Rendered dynamically -->
         </div>
 
         <div class="view-columns">
-          <!-- Revision Order Advisor -->
+          <!-- Progress Table -->
           <div class="glass-panel grid-card">
             <div class="grid-card-title">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/></svg>
-              Strategic Revision Order Recommendations
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+              Subject Syllabus Completions
             </div>
             <div class="custom-table-wrapper">
               <table class="custom-table">
                 <thead>
                   <tr>
-                    <th>Revision Rank</th>
-                    <th>Subject Name</th>
-                    <th>Urgency Level</th>
-                    <th>Days Remaining</th>
-                    <th>Suggested Today Action</th>
-                    <th>Crash Plan Status</th>
+                    <th>Subject</th>
+                    <th>Hours Studied</th>
+                    <th>Topics Completed</th>
+                    <th>Syllabus Progress (Target: 40 hrs)</th>
                   </tr>
                 </thead>
-                <tbody id="revision-recommendations-table">
+                <tbody id="progress-table-body">
                   <!-- Rendered dynamically -->
                 </tbody>
               </table>
             </div>
           </div>
 
-          <!-- Add Exam Form Modal hidden in grid -->
-          <div class="glass-panel grid-card" id="exam-form-card" style="display: none; min-height: auto;">
+          <!-- Log Progress Form -->
+          <div class="glass-panel grid-card" style="min-height: auto;">
             <div class="grid-card-title">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>
-              Add New Assessment
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              Log Study Effort
             </div>
-            <form class="glass-form" id="form-add-exam" onsubmit="return false;">
+            <form class="glass-form" id="form-add-progress" onsubmit="return false;">
               <div class="form-group">
-                <label for="exam-subject">Assessment Subject</label>
-                <input type="text" class="form-input" id="exam-subject" placeholder="e.g. Computer Networks" required>
+                <label for="progress-subject">Subject</label>
+                <input type="text" class="form-input" id="progress-subject" placeholder="e.g. DBMS" required>
               </div>
               <div class="form-group">
-                <label for="exam-date">Exam Date</label>
-                <input type="date" class="form-input" id="exam-date" required>
+                <label for="progress-hours">Total Study Hours</label>
+                <input type="number" class="form-input" id="progress-hours" placeholder="e.g. 15" min="0" required>
               </div>
               <div class="form-group">
-                <label for="exam-notes">Topics Covered / Notes</label>
-                <input type="text" class="form-input" id="exam-notes" placeholder="e.g. Chapters 1-5, TCP/IP Layer">
+                <label for="progress-topics">Topics Completed</label>
+                <input type="number" class="form-input" id="progress-topics" placeholder="e.g. 3" min="0" required>
               </div>
-              <div class="action-row" style="display: flex; gap: 10px;">
-                <button type="submit" class="glow-btn" id="btn-save-exam" style="flex: 1;">Save Exam Target</button>
-                <button type="button" class="secondary-btn" id="btn-close-exam-form">Cancel</button>
+              <div class="action-row">
+                <button type="submit" class="glow-btn" id="btn-save-progress">Update Progress Metrics</button>
               </div>
             </form>
           </div>
@@ -610,39 +544,7 @@
     </main>
   </div>
 
-  <!-- SETTINGS MODAL DIALOG -->
-  <div id="settings-modal" class="modal-overlay">
-    <div class="glass-panel modal-card">
-      <div class="card-header">
-        <h3>
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          API Connection Settings
-        </h3>
-        <button class="icon-btn" id="btn-close-settings" style="padding: 4px;">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>
-      <form class="glass-form" id="form-settings" onsubmit="return false;" style="margin-top: 16px;">
-        <div class="form-group">
-          <label for="settings-gemini-key">Google Gemini API Key</label>
-          <input type="password" class="form-input" id="settings-gemini-key" placeholder="AI-powered note parsing and chat coach key...">
-          <span style="font-size:0.75rem; color:var(--text-muted);">Get a free key from the <a href="https://aistudio.google.com/" target="_blank" style="color: var(--color-accent);">Google AI Studio</a>. Keys are stored locally in your browser.</span>
-        </div>
-        <div class="form-group" style="margin-top: 8px;">
-          <label for="settings-google-client-id">Google OAuth Client ID (Optional)</label>
-          <input type="text" class="form-input" id="settings-google-client-id" placeholder="Google Drive / Sheets API credentials client ID...">
-          <span style="font-size:0.75rem; color:var(--text-muted);">
-            If blank, we use a default workspace Client ID. To create your own, go to the <a href="https://console.cloud.google.com/" target="_blank" style="color: var(--color-accent);">Google Cloud Console</a>, enable Google Sheets/Drive/Calendar APIs, and create an OAuth Web Client ID for URL <code>http://localhost:5173</code>.
-          </span>
-        </div>
-        <div class="action-row" style="display: flex; gap: 10px; margin-top: 20px;">
-          <button type="submit" class="glow-btn" id="btn-save-settings" style="flex: 1;">Save Credentials</button>
-          <button type="button" class="secondary-btn" id="btn-cancel-settings">Cancel</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <script src="app.js"></script>
+  <!-- Load Modules starting from app.js -->
+  <script type="module" src="app.js"></script>
 </body>
 </html>
